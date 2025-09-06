@@ -1,0 +1,245 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Products - Farm produce and items for sale
+model Product {
+  id            String   @id @default(cuid())
+  name          String
+  description   String?
+  category      String   // e.g., "pepper", "herb", "spice", "vegetable"
+  variety       String?  // e.g., "Ghost Pepper", "Habanero", "Jalapeño"
+  origin        String?  // e.g., "Caribbean", "African", "Asian"
+  price         Float
+  unit          String   // e.g., "per lb", "per oz", "per piece"
+  stock         Int      @default(0)
+  minStock      Int      @default(5)
+  maxStock      Int      @default(100)
+  status        String   @default("active") // active, inactive, out_of_stock
+  image         String?
+  tags          String?  // JSON string of tags
+  nutritionInfo String?  // JSON string of nutrition data
+  growingInfo   String?  // JSON string of growing information
+  harvestDate   DateTime?
+  expiryDate    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Relations
+  orderItems    OrderItem[]
+  inventoryLogs InventoryLog[]
+  fieldProducts FieldProduct[]
+  
+  @@map("products")
+}
+
+// Fields - Farm field management
+model Field {
+  id               String   @id @default(cuid())
+  name             String
+  size             String   // e.g., "2.5 acres"
+  location         String?
+  soilType         String?
+  soilPh           Float?
+  status           String   @default("active") // active, fallow, maintenance
+  crop             String?
+  plantingDate     DateTime?
+  expectedHarvest  DateTime?
+  progress         Int      @default(0) // 0-100%
+  temperature      String?
+  humidity         String?
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  // Relations
+  fieldProducts    FieldProduct[]
+  operations       FieldOperation[]
+  carePrograms     CareProgram[]
+  
+  @@map("fields")
+}
+
+// Junction table for Field-Product relationship
+model FieldProduct {
+  id        String   @id @default(cuid())
+  fieldId   String
+  productId String
+  quantity  Int      @default(0)
+  plantedAt DateTime @default(now())
+  
+  field     Field   @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  product   Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@unique([fieldId, productId])
+  @@map("field_products")
+}
+
+// Field Operations - Tasks and activities
+model FieldOperation {
+  id             String   @id @default(cuid())
+  title          String
+  description    String?
+  fieldId        String
+  type           String   // planting, watering, fertilizing, harvesting, etc.
+  status         String   @default("pending") // pending, in_progress, completed
+  priority       String   @default("medium") // low, medium, high, urgent
+  assignedTo     String?
+  estimatedHours Int      @default(1)
+  actualHours    Float?
+  progress       Int      @default(0) // 0-100%
+  dueDate        DateTime
+  completedAt    DateTime?
+  tags           String?  // JSON array of tags
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  
+  field Field @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  
+  @@map("field_operations")
+}
+
+// Care Programs - Spray, fertilizer, watering schedules
+model CareProgram {
+  id              String   @id @default(cuid())
+  name            String
+  type            String   // spray, fertilizer, watering, pruning, etc.
+  fieldId         String
+  product         String   // Product/chemical/fertilizer used
+  dosage          String   // Amount/concentration
+  frequency       String   // daily, weekly, monthly, etc.
+  status          String   @default("active") // active, paused, completed
+  nextApplication DateTime
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  field Field @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+  
+  @@map("care_programs")
+}
+
+// Customers
+model Customer {
+  id          String   @id @default(cuid())
+  name        String
+  email       String   @unique
+  phone       String?
+  address     String?
+  city        String?
+  state       String?
+  zipCode     String?
+  customerType String  @default("individual") // individual, business, restaurant
+  status      String   @default("active") // active, inactive, suspended
+  leadScore   Int      @default(0) // 0-100
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  orders Order[]
+  
+  @@map("customers")
+}
+
+// Orders
+model Order {
+  id         String      @id @default(cuid())
+  orderNumber String     @unique
+  customerId String
+  status     String      @default("pending") // pending, confirmed, processing, shipped, delivered, cancelled
+  total      Float
+  subtotal   Float
+  tax        Float       @default(0)
+  shipping   Float       @default(0)
+  paymentStatus String   @default("pending") // pending, paid, failed, refunded
+  paymentMethod String?
+  shippingAddress String?
+  orderDate  DateTime    @default(now())
+  shippedDate DateTime?
+  deliveredDate DateTime?
+  notes      String?
+  
+  customer   Customer    @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  items      OrderItem[]
+  
+  @@map("orders")
+}
+
+// Order Items
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  total     Float
+  
+  order   Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@map("order_items")
+}
+
+// Inventory Management
+model InventoryLog {
+  id          String   @id @default(cuid())
+  productId   String
+  type        String   // in, out, adjustment, waste, harvest
+  quantity    Int
+  reason      String?
+  reference   String?  // Order ID, harvest batch, etc.
+  previousStock Int
+  newStock    Int
+  performedBy String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  
+  @@map("inventory_logs")
+}
+
+// Equipment Management
+model Equipment {
+  id          String   @id @default(cuid())
+  name        String
+  type        String   // tractor, irrigation, tools, etc.
+  model       String?
+  serialNumber String?
+  status      String   @default("operational") // operational, maintenance, repair, retired
+  condition   String   @default("good") // excellent, good, fair, poor
+  location    String?
+  purchaseDate DateTime?
+  purchasePrice Float?
+  warranty    String?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("equipment")
+}
+
+// Users/Staff Management
+model User {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  role      String   @default("worker") // admin, supervisor, agronomist, worker
+  status    String   @default("active") // active, inactive, suspended
+  hireDate  DateTime?
+  salary    Float?
+  permissions String? // JSON string of permissions
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@map("users")
+}
