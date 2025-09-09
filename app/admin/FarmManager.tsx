@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import EquipmentManager from './EquipmentManager';
 import FieldServiceManager from './FieldServiceManager';
 import UnifiedOperationsCalendar from './UnifiedOperationsCalendar';
@@ -424,6 +424,26 @@ export default function FarmManager() {
       ]
     }
   ]);
+
+  // Load care programs from API
+  useEffect(() => {
+    const loadCarePrograms = async () => {
+      try {
+        const response = await fetch('/api/care-programs');
+        if (response.ok) {
+          const apiCarePrograms = await response.json();
+          // Update state with API data, but keep fallback static data
+          if (apiCarePrograms && apiCarePrograms.length > 0) {
+            setSprayPrograms(apiCarePrograms);
+          }
+        }
+      } catch (error) {
+        console.warn('Failed to load care programs from API, using static data:', error);
+      }
+    };
+
+    loadCarePrograms();
+  }, []);
 
   const [reminders, setReminders] = useState([
     {
@@ -3057,8 +3077,8 @@ export default function FarmManager() {
           onClose={() => setShowUnifiedCalendar(false)}
           fieldOperations={fieldOperations}
           setFieldOperations={setFieldOperations}
-          sprayPrograms={sprayPrograms}
-          setSprayPrograms={setSprayPrograms}
+          carePrograms={sprayPrograms}
+          setCarePrograms={setSprayPrograms}
           fields={fields}
           reminders={reminders}
           setReminders={setReminders}

@@ -8,7 +8,7 @@ interface UnifiedEvent {
   date: string;
   startTime: string;
   endTime: string;
-  type: 'field-operation' | 'planting' | 'cultivation' | 'pruning' | 'harvesting' | 'irrigation' | 'weeding' | 'mulching' | 'transplanting' | 'soil-preparation' | 'composting' | 'equipment-maintenance' | 'spray-program' | 'fertilizer-program' | 'reminder' | 'manual';
+  type: 'field-operation' | 'planting' | 'cultivation' | 'pruning' | 'harvesting' | 'irrigation' | 'weeding' | 'mulching' | 'transplanting' | 'soil-preparation' | 'composting' | 'equipment-maintenance' | 'spray-program' | 'fertilizer-program' | 'watering-program' | 'pest-control' | 'disease-control' | 'reminder' | 'manual';
   sourceId?: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'pending';
@@ -24,14 +24,15 @@ interface UnifiedEvent {
   progress?: number;
   weatherDependency?: boolean;
   notes?: string;
+  careProgram?: any; // Reference to care program data
 }
 
 interface UnifiedOperationsCalendarProps {
   onClose: () => void;
   fieldOperations: any[];
   setFieldOperations: React.Dispatch<React.SetStateAction<any[]>>;
-  sprayPrograms: any[];
-  setSprayPrograms: React.Dispatch<React.SetStateAction<any[]>>;
+  carePrograms: any[]; // Renamed from sprayPrograms to better reflect actual data
+  setCarePrograms: React.Dispatch<React.SetStateAction<any[]>>;
   fields: any[];
   reminders: any[];
   setReminders: React.Dispatch<React.SetStateAction<any[]>>;
@@ -41,8 +42,8 @@ export default function UnifiedOperationsCalendar({
   onClose,
   fieldOperations,
   setFieldOperations,
-  sprayPrograms,
-  setSprayPrograms,
+  carePrograms,
+  setCarePrograms,
   fields,
   reminders,
   setReminders
@@ -50,7 +51,7 @@ export default function UnifiedOperationsCalendar({
   console.log('=== UNIFIED CALENDAR COMPONENT RENDER ===');
   console.log('Fields received:', fields?.length || 0, fields);
   console.log('Field Operations:', fieldOperations?.length || 0);
-  console.log('Spray Programs:', sprayPrograms?.length || 0);
+  console.log('Care Programs:', carePrograms?.length || 0);
   console.log('Reminders:', reminders?.length || 0);
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -94,9 +95,12 @@ export default function UnifiedOperationsCalendar({
       case 'soil-preparation': return 'bg-orange-600';
       case 'composting': return 'bg-green-700';
       case 'equipment-maintenance': return 'bg-slate-600';
-      // Application Programs
+      // Care Programs - Purple/Green family
       case 'spray-program': return 'bg-purple-500';
       case 'fertilizer-program': return 'bg-green-500';
+      case 'watering-program': return 'bg-blue-400';
+      case 'pest-control': return 'bg-red-500';
+      case 'disease-control': return 'bg-pink-500';
       // Other
       case 'reminder': return 'bg-orange-500';
       case 'manual': return 'bg-gray-500';
@@ -130,6 +134,9 @@ export default function UnifiedOperationsCalendar({
       case 'equipment-maintenance': return 'Equipment Maintenance';
       case 'spray-program': return 'Spray Program';
       case 'fertilizer-program': return 'Fertilizer Program';
+      case 'watering-program': return 'Watering Program';
+      case 'pest-control': return 'Pest Control';
+      case 'disease-control': return 'Disease Control';
       case 'reminder': return 'Reminder';
       case 'manual': return 'Manual Event';
       default: return 'Event';
@@ -152,6 +159,9 @@ export default function UnifiedOperationsCalendar({
       case 'equipment-maintenance': return 'ri-tools-fill';
       case 'spray-program': return 'ri-drop-line';
       case 'fertilizer-program': return 'ri-leaf-line';
+      case 'watering-program': return 'ri-water-drop-line';
+      case 'pest-control': return 'ri-bug-line';
+      case 'disease-control': return 'ri-medicine-bottle-line';
       case 'reminder': return 'ri-alarm-line';
       case 'manual': return 'ri-calendar-event-line';
       default: return 'ri-calendar-line';
@@ -187,28 +197,51 @@ export default function UnifiedOperationsCalendar({
       });
     });
 
-    // Spray Programs
-    sprayPrograms.forEach(program => {
+    // Care Programs - Convert to operation types
+    carePrograms.forEach((program: any) => {
       if (program.nextApplication && program.status === 'active') {
+        // Map care program types to operation types
+        let operationType = 'manual';
+        switch (program.type) {
+          case 'spray':
+            operationType = 'spray-program';
+            break;
+          case 'fertilizer':
+            operationType = 'fertilizer-program';
+            break;
+          case 'watering':
+            operationType = 'watering-program';
+            break;
+          case 'pest-control':
+            operationType = 'pest-control';
+            break;
+          case 'disease-control':
+            operationType = 'disease-control';
+            break;
+          default:
+            operationType = program.type || 'manual';
+        }
+
         events.push({
-          id: `spray-${program.id}`,
-          title: `${program.name} - ${program.field}`,
+          id: `care-${program.id}`,
+          title: `${program.name} - ${program.field?.name || program.field}`,
           date: program.nextApplication,
           startTime: '07:00',
           endTime: '09:00',
-          type: program.type === 'spray' ? 'spray-program' : 'fertilizer-program',
+          type: operationType as any,
           sourceId: program.id,
           priority: 'medium',
           status: 'scheduled',
           assignedTo: 'Farm Team',
-          field: program.field,
+          field: program.field?.name || program.field,
           description: `${program.type}: ${program.product} - ${program.dosage}`,
           equipment: [program.product],
-          color: getTypeColor(program.type === 'spray' ? 'spray-program' : 'fertilizer-program'),
+          color: getTypeColor(operationType),
           isDraggable: true,
           estimatedHours: 2,
           weatherDependency: program.type === 'spray',
-          notes: program.notes
+          notes: program.notes,
+          careProgram: program
         });
       }
     });
@@ -237,13 +270,13 @@ export default function UnifiedOperationsCalendar({
     console.log('Unified events generated:', {
       totalEvents: events.length,
       fieldOps: fieldOperations.length,
-      sprayPrograms: sprayPrograms.length,
+      carePrograms: carePrograms.length,
       reminders: reminders.length,
       events: events.map(e => ({ id: e.id, title: e.title, date: e.date, type: e.type }))
     });
 
     return events;
-  }, [fieldOperations, sprayPrograms, reminders]);
+  }, [fieldOperations, carePrograms, reminders]);
 
   const filteredEvents = useMemo(() => {
     return unifiedEvents.filter(event => {
@@ -439,9 +472,16 @@ export default function UnifiedOperationsCalendar({
           )
         );
         break;
+      case 'care':
+        setCarePrograms((prev: any) =>
+          prev.map((program: any) =>
+            program.id === id ? { ...program, nextApplication: newDate } : program
+          )
+        );
+        break;
       case 'spray':
-        setSprayPrograms(prev =>
-          prev.map(program =>
+        setCarePrograms((prev: any) =>
+          prev.map((program: any) =>
             program.id === numericId ? { ...program, nextApplication: newDate } : program
           )
         );
@@ -487,7 +527,7 @@ export default function UnifiedOperationsCalendar({
         setFieldOperations(prev => [...prev, newEvent as any]);
         break;
       case 'spray':
-        setSprayPrograms(prev => [...prev, newEvent as any]);
+        setCarePrograms((prev: any) => [...prev, newEvent as any]);
         break;
       case 'reminder':
         setReminders(prev => [...prev, newEvent as any]);
@@ -641,6 +681,13 @@ export default function UnifiedOperationsCalendar({
           )
         );
         break;
+      case 'care':
+        setCarePrograms((prev: any) =>
+          prev.map((program: any) =>
+            program.id === id ? { ...program, status: newStatus } : program
+          )
+        );
+        break;
     }
   };
 
@@ -773,7 +820,7 @@ export default function UnifiedOperationsCalendar({
   };
 
   const addEventFromProgram = (programType: 'spray' | 'fertilizer') => {
-    const availablePrograms = sprayPrograms.filter(program => 
+    const availablePrograms = carePrograms.filter((program: any) => 
       program.type === programType && program.status === 'active'
     );
 
@@ -826,7 +873,7 @@ export default function UnifiedOperationsCalendar({
         updatedAt: new Date().toISOString(),
         notes: `Created by drag and drop for ${fieldName} on ${date}`
       };
-      setSprayPrograms(prev => [...prev, newSprayProgram]);
+      setCarePrograms((prev: any) => [...prev, newSprayProgram]);
     } else if (programType === 'fertilizer') {
       const newFertilizerProgram = {
         id: newId,
@@ -846,7 +893,7 @@ export default function UnifiedOperationsCalendar({
         updatedAt: new Date().toISOString(),
         notes: `Created by drag and drop for ${fieldName} on ${date}`
       };
-      setSprayPrograms(prev => [...prev, newFertilizerProgram]);
+      setCarePrograms((prev: any) => [...prev, newFertilizerProgram]);
     } else {
       const newFieldOperation = {
         id: newId,
@@ -913,7 +960,7 @@ export default function UnifiedOperationsCalendar({
         type: eventData.type // Keep the specific operation type
       }]);
     } else if (eventData.type === 'spray-program') {
-      setSprayPrograms(prev => [...prev, {
+      setCarePrograms((prev: any) => [...prev, {
         ...newEvent,
         nextApplication: eventData.date,
         status: eventData.status || 'scheduled',
@@ -923,7 +970,7 @@ export default function UnifiedOperationsCalendar({
         type: 'spray'
       }]);
     } else if (eventData.type === 'fertilizer-program') {
-      setSprayPrograms(prev => [...prev, {
+      setCarePrograms((prev: any) => [...prev, {
         ...newEvent,
         nextApplication: eventData.date,
         status: eventData.status || 'scheduled',
@@ -954,9 +1001,16 @@ export default function UnifiedOperationsCalendar({
           )
         );
         break;
+      case 'care':
+        setCarePrograms((prev: any) =>
+          prev.map((program: any) =>
+            program.id === id ? { ...program, ...eventData, updatedAt: new Date().toISOString() } : program
+          )
+        );
+        break;
       case 'spray':
-        setSprayPrograms(prev =>
-          prev.map(program =>
+        setCarePrograms((prev: any) =>
+          prev.map((program: any) =>
             program.id === numericId ? { ...program, ...eventData, updatedAt: new Date().toISOString() } : program
           )
         );
@@ -1152,9 +1206,12 @@ export default function UnifiedOperationsCalendar({
                 <option value="composting">Composting</option>
                 <option value="equipment-maintenance">Equipment Maintenance</option>
               </optgroup>
-              <optgroup label="Application Programs">
+              <optgroup label="Care Programs">
                 <option value="spray-program">Spray Programs</option>
                 <option value="fertilizer-program">Fertilizer Programs</option>
+                <option value="watering-program">Watering Programs</option>
+                <option value="pest-control">Pest Control</option>
+                <option value="disease-control">Disease Control</option>
               </optgroup>
               <optgroup label="Other">
                 <option value="reminder">Reminders</option>
@@ -1215,6 +1272,9 @@ export default function UnifiedOperationsCalendar({
               { type: 'irrigation', label: 'Irrigation', color: 'bg-cyan-500' },
               { type: 'spray-program', label: 'Spray Programs', color: 'bg-purple-500' },
               { type: 'fertilizer-program', label: 'Fertilizer', color: 'bg-green-500' },
+              { type: 'watering-program', label: 'Watering', color: 'bg-blue-400' },
+              { type: 'pest-control', label: 'Pest Control', color: 'bg-red-500' },
+              { type: 'disease-control', label: 'Disease Control', color: 'bg-pink-500' },
               { type: 'reminder', label: 'Reminders', color: 'bg-orange-500' }
             ].map((item) => (
               <div key={item.type} className="flex items-center space-x-1">

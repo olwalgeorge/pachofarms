@@ -1,0 +1,10 @@
+{
+  "name": "Test Disease Control",
+  "type": "disease-control", 
+  "fieldId": "field-3",
+  "product": "Copper Fungicide",
+  "dosage": "1ml/L",
+  "frequency": "monthly",
+  "nextApplication": "2024-03-15T08:00:00.000Z",
+  "notes": "Test program"
+}
