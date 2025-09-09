@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Field Selector Modal</title>
+    <style>
+        /* Simple modal styling */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 1rem;
+        }
+        
+        .modal-content {
+            background: white;
+            border-radius: 0.75rem;
+            padding: 1.5rem;
+            max-width: 28rem;
+            width: 100%;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+            border: 2px solid #3b82f6;
+        }
+        
+        .field-card {
+            background: linear-gradient(to right, #f9fafb, #ffffff);
+            padding: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid #d1d5db;
+            margin: 0.75rem 0;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .field-card:hover {
+            background: linear-gradient(to right, #eff6ff, #dbeafe);
+            border-color: #3b82f6;
+        }
+        
+        .test-button {
+            background: #dc2626;
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .test-button:hover {
+            background: #b91c1c;
+        }
+        
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <h1>Field Selector Modal Test</h1>
+    <button class="test-button" onclick="showModal()">TEST FIELD SELECTOR MODAL</button>
+    
+    <div id="fieldSelectorModal" class="modal-backdrop hidden">
+        <div class="modal-content">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <div>
+                    <h3 style="font-size: 1.25rem; font-weight: 600; margin: 0;">Choose Field</h3>
+                    <p style="font-size: 0.875rem; color: #6b7280; margin: 0.25rem 0 0 0;">
+                        Select field for spray program on 2025-09-15
+                    </p>
+                </div>
+                <button onclick="hideModal()" style="background: none; border: none; color: #9ca3af; cursor: pointer;">✕</button>
+            </div>
+            
+            <div style="max-height: 15rem; overflow-y: auto;">
+                <div class="field-card" onclick="selectField('A')">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #111827;">Field A - African Varieties</div>
+                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                2.5 acres • Bird's Eye Chili • growing
+                            </div>
+                            <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem;">
+                                Prime field for African variety cultivation
+                            </div>
+                        </div>
+                        <div style="margin-left: 1rem; display: flex; align-items: center;">
+                            <div style="width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #10b981; margin-right: 0.5rem;"></div>
+                            <span>→</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="field-card" onclick="selectField('B')">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #111827;">Field B - Asian Mix</div>
+                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                1.8 acres • Thai Dragon & Cayenne • ready
+                            </div>
+                            <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem;">
+                                Mixed cultivation area optimized for Asian pepper varieties
+                            </div>
+                        </div>
+                        <div style="margin-left: 1rem; display: flex; align-items: center;">
+                            <div style="width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #f59e0b; margin-right: 0.5rem;"></div>
+                            <span>→</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="field-card" onclick="selectField('C')">
+                    <div style="display: flex; align-items: center; justify-content: space-between;">
+                        <div style="flex: 1;">
+                            <div style="font-weight: 600; color: #111827;">Field C - Caribbean Heat</div>
+                            <div style="font-size: 0.875rem; color: #6b7280; margin-top: 0.25rem;">
+                                3.2 acres • Habanero & Scotch Bonnet • seedling
+                            </div>
+                            <div style="font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem;">
+                                Largest field dedicated to high-heat Caribbean varieties
+                            </div>
+                        </div>
+                        <div style="margin-left: 1rem; display: flex; align-items: center;">
+                            <div style="width: 0.75rem; height: 0.75rem; border-radius: 50%; background: #6b7280; margin-right: 0.5rem;"></div>
+                            <span>→</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #e5e7eb; display: flex; justify-content: space-between;">
+                <button onclick="hideModal()" style="background: none; border: none; color: #6b7280; cursor: pointer;">Cancel</button>
+                <button onclick="selectField('A')" style="background: #6b7280; color: white; padding: 0.5rem 1rem; border: none; border-radius: 0.5rem; cursor: pointer;">
+                    Use First Field
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showModal() {
+            console.log('Showing field selector modal');
+            const modal = document.getElementById('fieldSelectorModal');
+            modal.classList.remove('hidden');
+        }
+        
+        function hideModal() {
+            console.log('Hiding field selector modal');
+            const modal = document.getElementById('fieldSelectorModal');
+            modal.classList.add('hidden');
+        }
+        
+        function selectField(fieldId) {
+            console.log('Selected field:', fieldId);
+            alert(`Selected field: ${fieldId} - Creating spray program for 2025-09-15`);
+            hideModal();
+        }
+        
+        // Close modal when clicking backdrop
+        document.getElementById('fieldSelectorModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideModal();
+            }
+        });
+    </script>
+</body>
+</html>

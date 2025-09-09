@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { dbHelpers } from '@/lib/database-api';
+import { prisma, dbHelpers } from '@/lib/database-api';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   try {

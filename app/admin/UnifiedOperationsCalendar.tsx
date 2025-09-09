@@ -8,7 +8,7 @@ interface UnifiedEvent {
   date: string;
   startTime: string;
   endTime: string;
-  type: 'field-operation' | 'spray-program' | 'fertilizer-program' | 'reminder' | 'manual';
+  type: 'field-operation' | 'planting' | 'cultivation' | 'pruning' | 'harvesting' | 'irrigation' | 'weeding' | 'mulching' | 'transplanting' | 'soil-preparation' | 'composting' | 'equipment-maintenance' | 'spray-program' | 'fertilizer-program' | 'reminder' | 'manual';
   sourceId?: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'pending';
@@ -47,6 +47,12 @@ export default function UnifiedOperationsCalendar({
   reminders,
   setReminders
 }: UnifiedOperationsCalendarProps) {
+  console.log('=== UNIFIED CALENDAR COMPONENT RENDER ===');
+  console.log('Fields received:', fields?.length || 0, fields);
+  console.log('Field Operations:', fieldOperations?.length || 0);
+  console.log('Spray Programs:', sprayPrograms?.length || 0);
+  console.log('Reminders:', reminders?.length || 0);
+  
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'month' | 'week' | 'day' | 'kanban'>('month');
   const [selectedEvent, setSelectedEvent] = useState<UnifiedEvent | null>(null);
@@ -56,6 +62,101 @@ export default function UnifiedOperationsCalendar({
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [draggedEvent, setDraggedEvent] = useState<UnifiedEvent | null>(null);
+  const [dropZoneDate, setDropZoneDate] = useState<string | null>(null);
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [quickAddDate, setQuickAddDate] = useState<string | null>(null);
+  const [quickAddPosition, setQuickAddPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDraggingToCalendar, setIsDraggingToCalendar] = useState(false);
+  const [dragTargetDate, setDragTargetDate] = useState<string | null>(null);
+  const [recentlyCreatedEvent, setRecentlyCreatedEvent] = useState<string | null>(null);
+  const [showSuccessToast, setShowSuccessToast] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showFieldSelector, setShowFieldSelector] = useState(false);
+  const [pendingEventData, setPendingEventData] = useState<{
+    date: string;
+    programType: 'spray' | 'fertilizer' | 'manual';
+    position: { x: number; y: number };
+  } | null>(null);
+
+  // Helper functions (defined before useMemo to avoid hoisting issues)
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      // Field Operations - Blue family
+      case 'field-operation': return 'bg-blue-500';
+      case 'planting': return 'bg-green-600';
+      case 'cultivation': return 'bg-amber-600';
+      case 'pruning': return 'bg-emerald-600';
+      case 'harvesting': return 'bg-yellow-600';
+      case 'irrigation': return 'bg-cyan-500';
+      case 'weeding': return 'bg-lime-600';
+      case 'mulching': return 'bg-stone-600';
+      case 'transplanting': return 'bg-teal-600';
+      case 'soil-preparation': return 'bg-orange-600';
+      case 'composting': return 'bg-green-700';
+      case 'equipment-maintenance': return 'bg-slate-600';
+      // Application Programs
+      case 'spray-program': return 'bg-purple-500';
+      case 'fertilizer-program': return 'bg-green-500';
+      // Other
+      case 'reminder': return 'bg-orange-500';
+      case 'manual': return 'bg-gray-500';
+      default: return 'bg-blue-500';
+    }
+  };
+
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'urgent': return 'border-l-red-500';
+      case 'high': return 'border-l-orange-500';
+      case 'medium': return 'border-l-yellow-500';
+      case 'low': return 'border-l-green-500';
+      default: return 'border-l-gray-500';
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'field-operation': return 'General Field Operation';
+      case 'planting': return 'Planting/Seeding';
+      case 'cultivation': return 'Cultivation/Tilling';
+      case 'pruning': return 'Pruning/Trimming';
+      case 'harvesting': return 'Harvesting';
+      case 'irrigation': return 'Irrigation';
+      case 'weeding': return 'Weeding';
+      case 'mulching': return 'Mulching';
+      case 'transplanting': return 'Transplanting';
+      case 'soil-preparation': return 'Soil Preparation';
+      case 'composting': return 'Composting';
+      case 'equipment-maintenance': return 'Equipment Maintenance';
+      case 'spray-program': return 'Spray Program';
+      case 'fertilizer-program': return 'Fertilizer Program';
+      case 'reminder': return 'Reminder';
+      case 'manual': return 'Manual Event';
+      default: return 'Event';
+    }
+  };
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'field-operation': return 'ri-plant-line';
+      case 'planting': return 'ri-seedling-line';
+      case 'cultivation': return 'ri-tools-line';
+      case 'pruning': return 'ri-scissors-cut-line';
+      case 'harvesting': return 'ri-harvest-line';
+      case 'irrigation': return 'ri-drop-line';
+      case 'weeding': return 'ri-leaf-line';
+      case 'mulching': return 'ri-stack-line';
+      case 'transplanting': return 'ri-plant-fill';
+      case 'soil-preparation': return 'ri-landscape-line';
+      case 'composting': return 'ri-recycle-line';
+      case 'equipment-maintenance': return 'ri-tools-fill';
+      case 'spray-program': return 'ri-drop-line';
+      case 'fertilizer-program': return 'ri-leaf-line';
+      case 'reminder': return 'ri-alarm-line';
+      case 'manual': return 'ri-calendar-event-line';
+      default: return 'ri-calendar-line';
+    }
+  };
 
   // Convert data to unified events
   const unifiedEvents = useMemo(() => {
@@ -69,7 +170,7 @@ export default function UnifiedOperationsCalendar({
         date: op.dueDate,
         startTime: '08:00',
         endTime: `${8 + (op.estimatedHours || 4)}:00`.padStart(5, '0'),
-        type: 'field-operation',
+        type: op.type || 'field-operation', // Use the specific operation type if available
         sourceId: op.id,
         priority: op.priority as any,
         status: op.status === 'planning' ? 'scheduled' : op.status as any,
@@ -77,7 +178,7 @@ export default function UnifiedOperationsCalendar({
         field: op.field,
         description: op.description,
         tags: op.tags,
-        color: getTypeColor('field-operation'),
+        color: getTypeColor(op.type || 'field-operation'), // Use specific type color
         isDraggable: true,
         estimatedHours: op.estimatedHours,
         actualHours: op.actualHours,
@@ -88,7 +189,7 @@ export default function UnifiedOperationsCalendar({
 
     // Spray Programs
     sprayPrograms.forEach(program => {
-      if (program.nextApplication) {
+      if (program.nextApplication && program.status === 'active') {
         events.push({
           id: `spray-${program.id}`,
           title: `${program.name} - ${program.field}`,
@@ -133,6 +234,14 @@ export default function UnifiedOperationsCalendar({
       });
     });
 
+    console.log('Unified events generated:', {
+      totalEvents: events.length,
+      fieldOps: fieldOperations.length,
+      sprayPrograms: sprayPrograms.length,
+      reminders: reminders.length,
+      events: events.map(e => ({ id: e.id, title: e.title, date: e.date, type: e.type }))
+    });
+
     return events;
   }, [fieldOperations, sprayPrograms, reminders]);
 
@@ -149,17 +258,6 @@ export default function UnifiedOperationsCalendar({
     });
   }, [unifiedEvents, filterType, filterStatus, searchTerm]);
 
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'field-operation': return 'bg-blue-500';
-      case 'spray-program': return 'bg-purple-500';
-      case 'fertilizer-program': return 'bg-green-500';
-      case 'reminder': return 'bg-orange-500';
-      case 'manual': return 'bg-gray-500';
-      default: return 'bg-blue-500';
-    }
-  };
-
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'scheduled': return 'bg-blue-100 text-blue-800';
@@ -168,16 +266,6 @@ export default function UnifiedOperationsCalendar({
       case 'cancelled': return 'bg-red-100 text-red-800';
       case 'pending': return 'bg-orange-100 text-orange-800';
       default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getPriorityColor = (priority: string) => {
-    switch (priority) {
-      case 'low': return 'border-l-green-400';
-      case 'medium': return 'border-l-yellow-400';
-      case 'high': return 'border-l-orange-400';
-      case 'urgent': return 'border-l-red-400';
-      default: return 'border-l-gray-400';
     }
   };
 
@@ -210,20 +298,133 @@ export default function UnifiedOperationsCalendar({
     setDraggedEvent(event);
     e.dataTransfer.setData('text/plain', event.id);
     e.dataTransfer.effectAllowed = 'move';
+    
+    // Add visual feedback
+    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
+    dragImage.style.transform = 'rotate(5deg)';
+    dragImage.style.opacity = '0.8';
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+    // Support both move and copy operations
+    e.dataTransfer.dropEffect = e.dataTransfer.effectAllowed === 'copy' ? 'copy' : 'move';
+    console.log('Drag over - effect allowed:', e.dataTransfer.effectAllowed, 'drop effect:', e.dataTransfer.dropEffect);
+  };
+
+  const handleDragEnter = (date: string, e: React.DragEvent) => {
+    e.preventDefault();
+    console.log('=== DRAG ENTER ===', date);
+    console.log('DataTransfer types:', e.dataTransfer.types);
+    console.log('Has text/plain:', e.dataTransfer.types.includes('text/plain'));
+    
+    const draggedData = e.dataTransfer.types.includes('text/plain');
+    
+    setDropZoneDate(date);
+    
+    // If we're in add/edit mode or dragging a button, also set the drag target for date setting
+    if (showAddEvent || editingEvent || draggedData) {
+      setDragTargetDate(date);
+      setIsDraggingToCalendar(true);
+      console.log('Set drag target date:', date);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    // Only clear if we're leaving the calendar cell completely
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setDropZoneDate(null);
+      setDragTargetDate(null);
+      setIsDraggingToCalendar(false);
+    }
   };
 
   const handleDrop = (newDate: string, e: React.DragEvent) => {
     e.preventDefault();
-    if (!draggedEvent) return;
+    setDropZoneDate(null);
+    setDragTargetDate(null);
+    setIsDraggingToCalendar(false);
+    
+    const draggedData = e.dataTransfer.getData('text/plain');
+    console.log('=== DROP EVENT DEBUG ===');
+    console.log('Drop date:', newDate);
+    console.log('Dragged data:', draggedData);
+    console.log('Event dataTransfer types:', e.dataTransfer.types);
+    console.log('Fields available:', fields?.length || 0, fields);
+    console.log('Current showFieldSelector state:', showFieldSelector);
+    
+    // If we're in add/edit mode and dragging from modal, set the date in the form
+    if ((showAddEvent || editingEvent) && draggedData === 'modal-drag') {
+      console.log('Setting date in form for modal drag');
+      const dateInput = document.querySelector('input[name="date"]') as HTMLInputElement;
+      if (dateInput) {
+        dateInput.value = newDate;
+        // Trigger change event to update any form state
+        dateInput.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+      return;
+    }
+    
+    // If dragging a button to calendar, show field selector
+    if (draggedData.startsWith('button-')) {
+      const buttonType = draggedData.split('-')[1] as 'spray' | 'fertilizer' | 'manual';
+      console.log('=== BUTTON DRAG DETECTED ===');
+      console.log('Button type:', buttonType);
+      console.log('Setting pending event data and showing field selector...');
+      
+      // Store the event data and show field selector
+      const pendingData = {
+        date: newDate,
+        programType: buttonType,
+        position: { x: e.clientX, y: e.clientY }
+      };
+      
+      console.log('Pending data:', pendingData);
+      console.log('Fields available for selector:', fields?.length || 0);
+      
+      // Force the modal to show immediately
+      setPendingEventData(pendingData);
+      setShowFieldSelector(true);
+      
+      // Double-check the state was set correctly
+      setTimeout(() => {
+        console.log('=== POST-SET STATE CHECK ===');
+        console.log('showFieldSelector should be true');
+        console.log('pendingEventData should be set');
+        // Force another update if needed
+        setShowFieldSelector(true);
+      }, 50);
+      
+      console.log('=== FIELD SELECTOR SHOULD BE VISIBLE NOW ===');
+      console.log('showFieldSelector set to true, pendingEventData:', pendingData);
+      return;
+    }
+    
+    if (!draggedEvent) {
+      console.log('No dragged event found, ending drop handler');
+      return;
+    }
 
+    console.log('Moving existing event to new date');
     // Update the event date
     updateEventDate(draggedEvent.id, newDate);
     setDraggedEvent(null);
+  };
+
+  const handleCellDoubleClick = (date: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setQuickAddDate(date);
+    setQuickAddPosition({ x: e.clientX, y: e.clientY });
+    setShowQuickAdd(true);
+  };
+
+  const handleRightClick = (date: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    setQuickAddDate(date);
+    setQuickAddPosition({ x: e.clientX, y: e.clientY });
+    setShowQuickAdd(true);
   };
 
   const updateEventDate = (eventId: string, newDate: string) => {
@@ -253,6 +454,48 @@ export default function UnifiedOperationsCalendar({
         );
         break;
     }
+  };
+
+  const createQuickEvent = (eventType: 'field' | 'spray' | 'reminder', title: string) => {
+    if (!quickAddDate) return;
+
+    const newId = Date.now(); // Simple ID generation
+    const newEvent = {
+      id: newId,
+      title,
+      dueDate: quickAddDate,
+      ...(eventType === 'field' && {
+        type: 'planting' as const,
+        priority: 'medium' as const,
+        fieldId: 1,
+        assignedTo: 'Farm Manager'
+      }),
+      ...(eventType === 'spray' && {
+        nextApplication: quickAddDate,
+        fieldId: 1,
+        product: title,
+        dosage: '1L/ha'
+      }),
+      ...(eventType === 'reminder' && {
+        description: title,
+        priority: 'medium' as const
+      })
+    };
+
+    switch (eventType) {
+      case 'field':
+        setFieldOperations(prev => [...prev, newEvent as any]);
+        break;
+      case 'spray':
+        setSprayPrograms(prev => [...prev, newEvent as any]);
+        break;
+      case 'reminder':
+        setReminders(prev => [...prev, newEvent as any]);
+        break;
+    }
+
+    setShowQuickAdd(false);
+    setQuickAddDate(null);
   };
 
   const navigateMonth = (direction: 'prev' | 'next') => {
@@ -324,30 +567,54 @@ export default function UnifiedOperationsCalendar({
                   key={event.id}
                   draggable={event.isDraggable}
                   onDragStart={(e) => handleDragStart(event, e)}
-                  className={`bg-white rounded-lg p-4 shadow-sm border-l-4 hover:shadow-md transition-shadow cursor-pointer ${getPriorityColor(event.priority)}`}
+                  className={`bg-white rounded-xl p-4 shadow-md border-l-4 hover:shadow-lg transition-all duration-300 cursor-pointer transform hover:scale-102 ${getPriorityColor(event.priority)} ${
+                    recentlyCreatedEvent === event.id ? 'ring-4 ring-yellow-400 ring-opacity-100 animate-pulse scale-105 shadow-lg shadow-yellow-200 border-yellow-300 bg-gradient-to-br from-yellow-50 to-white' : ''
+                  } relative group`}
                   onClick={() => setSelectedEvent(event)}
+                  title={recentlyCreatedEvent === event.id ? 'Recently created - Click to edit!' : ''}
+                  style={{
+                    background: recentlyCreatedEvent === event.id 
+                      ? 'linear-gradient(135deg, #fef3c7, #ffffff)'
+                      : undefined
+                  }}
                 >
+                  {/* Sticker corner peel effect */}
+                  <div className="absolute top-0 right-0 w-0 h-0 border-l-6 border-b-6 border-l-transparent border-b-gray-100 opacity-30"></div>
+                  
                   <div className="flex justify-between items-start mb-2">
-                    <h5 className="font-medium text-gray-900 text-sm leading-tight">
+                    <h5 className="font-semibold text-gray-900 text-sm leading-tight pr-2">
                       {event.title}
+                      {recentlyCreatedEvent === event.id && (
+                        <div className="flex items-center space-x-2 mt-1">
+                          <span className="bg-yellow-400 text-yellow-900 text-xs px-2 py-1 rounded-full font-bold animate-bounce">
+                            NEW STICKER
+                          </span>
+                          <i className="ri-edit-line text-blue-600 animate-bounce" title="Click to edit"></i>
+                        </div>
+                      )}
                     </h5>
-                    <div className={`w-3 h-3 rounded-full ${event.color} flex-shrink-0 ml-2`}></div>
+                    <div className={`w-4 h-4 rounded-full ${event.color} flex-shrink-0 shadow-sm`}></div>
                   </div>
 
-                  <p className="text-xs text-gray-600 mb-2">
-                    {event.field}
+                  <p className="text-xs text-gray-600 mb-2 font-medium">
+                    📍 {event.field}
                   </p>
 
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{event.date}</span>
-                    <span>{event.assignedTo}</span>
+                  <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
+                    <span className="bg-gray-100 px-2 py-1 rounded-full">📅 {event.date}</span>
+                    <span className="bg-gray-100 px-2 py-1 rounded-full">👤 {event.assignedTo}</span>
                   </div>
+
+                  {/* Highlight glow for new stickers */}
+                  {recentlyCreatedEvent === event.id && (
+                    <div className="absolute inset-0 rounded-xl bg-gradient-to-br from-yellow-200 to-transparent opacity-20 pointer-events-none animate-pulse"></div>
+                  )}
 
                   {event.progress !== undefined && (
                     <div className="mt-2">
-                      <div className="w-full bg-gray-200 rounded-full h-1">
+                      <div className="w-full bg-gray-200 rounded-full h-2">
                         <div
-                          className="bg-green-500 h-1 rounded-full"
+                          className="bg-green-500 h-2 rounded-full transition-all duration-500"
                           style={{ width: `${event.progress}%` }}
                         ></div>
                       </div>
@@ -401,9 +668,22 @@ export default function UnifiedOperationsCalendar({
           key={day}
           className={`min-h-32 border border-gray-200 p-2 bg-white hover:bg-gray-50 transition-colors ${
             isToday ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-300' : ''
+          } ${dropZoneDate === date ? 'bg-green-100 border-green-400 border-dashed ring-2 ring-green-200' : ''} ${
+            dragTargetDate === date && isDraggingToCalendar ? 'bg-blue-100 border-blue-400 border-dashed ring-2 ring-blue-200' : ''
           }`}
+          title={
+            dragTargetDate === date && isDraggingToCalendar 
+              ? `Drop to set date to ${date}` 
+              : dropZoneDate === date 
+                ? `Drop here to move event to ${date}` 
+                : `Double-click to add event to ${date} • Drag buttons here to quick-add`
+          }
           onDragOver={handleDragOver}
+          onDragEnter={(e) => handleDragEnter(date, e)}
+          onDragLeave={handleDragLeave}
           onDrop={(e) => handleDrop(date, e)}
+          onDoubleClick={(e) => handleCellDoubleClick(date, e)}
+          onContextMenu={(e) => handleRightClick(date, e)}
         >
           <div className={`text-sm font-semibold mb-2 flex items-center justify-between ${
             isToday ? 'text-blue-600' : 'text-gray-900'
@@ -426,13 +706,37 @@ export default function UnifiedOperationsCalendar({
                   e.stopPropagation();
                   setSelectedEvent(event);
                 }}
-                className={`${event.color} text-white text-xs p-1.5 rounded cursor-pointer hover:opacity-90 transition-opacity shadow-sm border-l-2 ${getPriorityColor(event.priority)}`}
-                title={`${event.title} - ${formatTime(event.startTime)}`}
+                className={`${event.color} text-white text-xs p-2 rounded-lg cursor-pointer hover:opacity-90 transition-all duration-200 shadow-md border-l-4 ${getPriorityColor(event.priority)} ${
+                  draggedEvent?.id === event.id ? 'opacity-50 rotate-3 scale-95' : ''
+                } ${
+                  recentlyCreatedEvent === event.id ? 'ring-4 ring-yellow-400 ring-opacity-100 animate-pulse scale-110 shadow-lg shadow-yellow-200 border-yellow-300' : ''
+                } relative group hover:scale-105 hover:shadow-lg transform`}
+                title={`${event.title} - ${formatTime(event.startTime)} ${recentlyCreatedEvent === event.id ? '(Recently created - Click to edit!)' : ''}`}
+                style={{
+                  background: recentlyCreatedEvent === event.id 
+                    ? `linear-gradient(135deg, ${event.color.replace('bg-', '')}, ${event.color.replace('bg-', '')}-400)`
+                    : undefined
+                }}
               >
-                <div className="flex items-center space-x-1">
-                  <span className="truncate font-medium">{formatTime(event.startTime)}</span>
+                <div className="flex items-center justify-between">
+                  <span className="truncate font-semibold text-shadow-sm">{formatTime(event.startTime)}</span>
+                  {recentlyCreatedEvent === event.id && (
+                    <div className="flex items-center space-x-1">
+                      <span className="bg-yellow-400 text-yellow-900 text-xs px-1.5 py-0.5 rounded-full font-bold animate-bounce">NEW</span>
+                      <i className="ri-edit-line animate-bounce text-yellow-200" title="Click to edit"></i>
+                    </div>
+                  )}
                 </div>
-                <div className="truncate font-medium">{event.title}</div>
+                <div className="truncate font-bold mt-1 text-shadow-sm">{event.title}</div>
+                <div className="text-xs opacity-90 truncate">{event.field}</div>
+                
+                {/* Sticker effect - corner peel */}
+                <div className="absolute top-0 right-0 w-0 h-0 border-l-4 border-b-4 border-l-transparent border-b-white opacity-20"></div>
+                
+                {/* Highlight glow for new events */}
+                {recentlyCreatedEvent === event.id && (
+                  <div className="absolute inset-0 rounded-lg bg-gradient-to-br from-yellow-200 to-transparent opacity-30 pointer-events-none animate-pulse"></div>
+                )}
               </div>
             ))}
             {dayEvents.length > 3 && (
@@ -478,13 +782,198 @@ export default function UnifiedOperationsCalendar({
       return;
     }
 
-    // Show program selection modal
+    // Show program selection modal with pre-selected type
     setShowAddEvent(true);
+    
+    // Pre-fill the form with the selected program type
+    setTimeout(() => {
+      const typeSelect = document.querySelector('select[name="type"]') as HTMLSelectElement;
+      if (typeSelect) {
+        typeSelect.value = programType === 'spray' ? 'spray-program' : 'fertilizer-program';
+        typeSelect.dispatchEvent(new Event('change', { bubbles: true }));
+      }
+    }, 100);
+  };
+
+  const handleButtonDragToCalendar = (date: string, programType: 'spray' | 'fertilizer' | 'manual', selectedField?: any) => {
+    // Create a new event with the dropped date and button type
+    const newId = Date.now();
+    
+    // Use the selected field or default to the first available field
+    const targetField = selectedField || (fields && fields.length > 0 ? fields[0] : { id: 'A', name: 'Main Field' });
+    const fieldName = targetField.name || `Field ${targetField.id}`;
+    const fieldId = targetField.id;
+    
+    console.log('Creating event with field:', { fieldName, fieldId, targetField, allFields: fields });
+    
+    // Directly add to the appropriate state array for immediate visibility
+    if (programType === 'spray') {
+      const newSprayProgram = {
+        id: newId,
+        name: `Spray Application - ${fieldName}`,
+        title: `Spray Application - ${fieldName}`,
+        nextApplication: date,
+        field: fieldName,
+        fieldId: fieldId,
+        product: 'Spray Product',
+        dosage: '1L/ha',
+        type: 'spray' as const,
+        status: 'active' as const,
+        priority: 'medium' as const,
+        assignedTo: 'Farm Manager',
+        description: `Spray application created by drag & drop for ${fieldName}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        notes: `Created by drag and drop for ${fieldName} on ${date}`
+      };
+      setSprayPrograms(prev => [...prev, newSprayProgram]);
+    } else if (programType === 'fertilizer') {
+      const newFertilizerProgram = {
+        id: newId,
+        name: `Fertilizer Application - ${fieldName}`,
+        title: `Fertilizer Application - ${fieldName}`,
+        nextApplication: date,
+        field: fieldName,
+        fieldId: fieldId,
+        product: 'Fertilizer Product',
+        dosage: '2kg/ha',
+        type: 'fertilizer' as const,
+        status: 'active' as const,
+        priority: 'medium' as const,
+        assignedTo: 'Farm Manager',
+        description: `Fertilizer application created by drag & drop for ${fieldName}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        notes: `Created by drag and drop for ${fieldName} on ${date}`
+      };
+      setSprayPrograms(prev => [...prev, newFertilizerProgram]);
+    } else {
+      const newFieldOperation = {
+        id: newId,
+        title: `Field Operation - ${fieldName}`,
+        dueDate: date,
+        estimatedHours: 4,
+        field: fieldName,
+        fieldId: fieldId,
+        type: 'field-operation' as const,
+        status: 'scheduled' as const,
+        priority: 'medium' as const,
+        assignedTo: 'Farm Manager',
+        description: `Field operation created by drag & drop for ${fieldName}`,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tags: [],
+        progress: 0
+      };
+      setFieldOperations(prev => [...prev, newFieldOperation]);
+    }
+
+    // Show success feedback
+    const eventId = programType === 'spray' ? `spray-${newId}` : programType === 'fertilizer' ? `spray-${newId}` : `field-op-${newId}`;
+    setRecentlyCreatedEvent(eventId);
+    
+    // Show success toast
+    setSuccessMessage(`${programType === 'spray' ? 'Spray' : programType === 'fertilizer' ? 'Fertilizer' : 'Field'} sticker added to ${date} for ${fieldName}! Click the highlighted sticker to edit.`);
+    setShowSuccessToast(true);
+    
+    // Clear the highlight and toast after 3 seconds
+    setTimeout(() => {
+      setRecentlyCreatedEvent(null);
+      setShowSuccessToast(false);
+    }, 3000);
+    
+    console.log(`${programType} event created successfully for ${date}`, { eventId, date, field: fieldName, fieldId });
+  };
+
+  const handleAddEvent = (eventData: any) => {
+    const newId = Date.now();
+    const newEvent = {
+      id: newId,
+      ...eventData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    // Check if it's a field operation type (including all the new types)
+    const fieldOperationTypes = [
+      'field-operation', 'planting', 'cultivation', 'pruning', 'harvesting', 
+      'irrigation', 'weeding', 'mulching', 'transplanting', 'soil-preparation', 
+      'composting', 'equipment-maintenance'
+    ];
+
+    if (fieldOperationTypes.includes(eventData.type)) {
+      setFieldOperations(prev => [...prev, {
+        ...newEvent,
+        dueDate: eventData.date,
+        status: eventData.status || 'scheduled',
+        priority: eventData.priority || 'medium',
+        estimatedHours: eventData.estimatedHours || 4,
+        assignedTo: eventData.assignedTo || 'Farm Manager',
+        field: eventData.field || 'Field 1',
+        type: eventData.type // Keep the specific operation type
+      }]);
+    } else if (eventData.type === 'spray-program') {
+      setSprayPrograms(prev => [...prev, {
+        ...newEvent,
+        nextApplication: eventData.date,
+        status: eventData.status || 'scheduled',
+        fieldId: eventData.fieldId || 1,
+        product: eventData.product || eventData.title,
+        dosage: eventData.dosage || '1L/ha',
+        type: 'spray'
+      }]);
+    } else if (eventData.type === 'fertilizer-program') {
+      setSprayPrograms(prev => [...prev, {
+        ...newEvent,
+        nextApplication: eventData.date,
+        status: eventData.status || 'scheduled',
+        fieldId: eventData.fieldId || 1,
+        product: eventData.product || eventData.title,
+        dosage: eventData.dosage || '1L/ha',
+        type: 'fertilizer'
+      }]);
+    } else if (eventData.type === 'reminder') {
+      setReminders(prev => [...prev, {
+        ...newEvent,
+        dueDate: eventData.date,
+        status: eventData.status || 'pending',
+        priority: eventData.priority || 'medium'
+      }]);
+    }
+  };
+
+  const handleUpdateEvent = (eventId: string, eventData: any) => {
+    const [type, id] = eventId.split('-').slice(0, 2);
+    const numericId = parseInt(id);
+
+    switch (type) {
+      case 'field':
+        setFieldOperations(prev => 
+          prev.map(op => 
+            op.id === numericId ? { ...op, ...eventData, updatedAt: new Date().toISOString() } : op
+          )
+        );
+        break;
+      case 'spray':
+        setSprayPrograms(prev =>
+          prev.map(program =>
+            program.id === numericId ? { ...program, ...eventData, updatedAt: new Date().toISOString() } : program
+          )
+        );
+        break;
+      case 'reminder':
+        setReminders(prev =>
+          prev.map(reminder =>
+            reminder.id === numericId ? { ...reminder, ...eventData, updatedAt: new Date().toISOString() } : reminder
+          )
+        );
+        break;
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl w-full max-w-9xl h-[95vh] flex flex-col shadow-2xl">
+      <div className="bg-white rounded-xl w-full max-w-9xl h-[95vh] flex flex-col shadow-2xl relative">
         {/* Header */}
         <div className="bg-gradient-to-r from-green-600 via-green-700 to-emerald-600 px-6 py-4 text-white rounded-t-xl">
           <div className="flex justify-between items-center">
@@ -556,22 +1045,76 @@ export default function UnifiedOperationsCalendar({
             {/* Quick Add Buttons */}
             <div className="flex items-center space-x-2">
               <button
+                draggable
+                onDragStart={(e) => {
+                  console.log('=== SPRAY BUTTON DRAG START ===');
+                  e.dataTransfer.setData('text/plain', 'button-spray');
+                  e.dataTransfer.effectAllowed = 'copy';
+                  setIsDraggingToCalendar(true);
+                  console.log('Drag data set to: button-spray');
+                  console.log('DataTransfer object:', e.dataTransfer);
+                }}
+                onDragEnd={() => {
+                  console.log('Spray button drag ended');
+                  setIsDraggingToCalendar(false);
+                  setDragTargetDate(null);
+                }}
                 onClick={() => addEventFromProgram('spray')}
-                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors cursor-pointer whitespace-nowrap font-medium shadow-sm text-sm"
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors cursor-grab active:cursor-grabbing whitespace-nowrap font-medium shadow-sm text-sm relative group border-2 border-purple-400"
+                title="🖱️ DRAG ME to calendar date or click to add spray program"
               >
-                <i className="ri-drop-line mr-2"></i>Add Spray
+                <i className="ri-drop-line mr-2"></i>🖱️ Add Spray
+                <span className="absolute top-0 right-0 transform translate-x-1 -translate-y-1 bg-yellow-500 text-black text-xs px-1 rounded-full opacity-100 group-hover:opacity-100 transition-opacity font-bold">
+                  DRAG
+                </span>
               </button>
               <button
+                draggable
+                onDragStart={(e) => {
+                  console.log('=== FERTILIZER BUTTON DRAG START ===');
+                  e.dataTransfer.setData('text/plain', 'button-fertilizer');
+                  e.dataTransfer.effectAllowed = 'copy';
+                  setIsDraggingToCalendar(true);
+                  console.log('Drag data set to: button-fertilizer');
+                  console.log('DataTransfer object:', e.dataTransfer);
+                }}
+                onDragEnd={() => {
+                  console.log('Fertilizer button drag ended');
+                  setIsDraggingToCalendar(false);
+                  setDragTargetDate(null);
+                }}
                 onClick={() => addEventFromProgram('fertilizer')}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors cursor-pointer whitespace-nowrap font-medium shadow-sm text-sm"
+                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors cursor-grab active:cursor-grabbing whitespace-nowrap font-medium shadow-sm text-sm relative group border-2 border-green-400"
+                title="🖱️ DRAG ME to calendar date or click to add fertilizer program"
               >
-                <i className="ri-leaf-line mr-2"></i>Add Fertilizer
+                <i className="ri-leaf-line mr-2"></i>🖱️ Add Fertilizer
+                <span className="absolute top-0 right-0 transform translate-x-1 -translate-y-1 bg-yellow-500 text-black text-xs px-1 rounded-full opacity-100 group-hover:opacity-100 transition-opacity font-bold">
+                  DRAG
+                </span>
               </button>
               <button
+                draggable
+                onDragStart={(e) => {
+                  console.log('=== MANUAL BUTTON DRAG START ===');
+                  e.dataTransfer.setData('text/plain', 'button-manual');
+                  e.dataTransfer.effectAllowed = 'copy';
+                  setIsDraggingToCalendar(true);
+                  console.log('Drag data set to: button-manual');
+                  console.log('DataTransfer object:', e.dataTransfer);
+                }}
+                onDragEnd={() => {
+                  console.log('Manual button drag ended');
+                  setIsDraggingToCalendar(false);
+                  setDragTargetDate(null);
+                }}
                 onClick={() => setShowAddEvent(true)}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-pointer whitespace-nowrap font-medium shadow-sm text-sm"
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors cursor-grab active:cursor-grabbing whitespace-nowrap font-medium shadow-sm text-sm relative group border-2 border-blue-400"
+                title="🖱️ DRAG ME to calendar date or click to add manual event"
               >
-                <i className="ri-add-line mr-2"></i>Add Manual
+                <i className="ri-add-line mr-2"></i>🖱️ Add Manual
+                <span className="absolute top-0 right-0 transform translate-x-1 -translate-y-1 bg-yellow-500 text-black text-xs px-1 rounded-full opacity-100 group-hover:opacity-100 transition-opacity font-bold">
+                  DRAG
+                </span>
               </button>
             </div>
           </div>
@@ -595,11 +1138,28 @@ export default function UnifiedOperationsCalendar({
               className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent pr-8"
             >
               <option value="all">All Types</option>
-              <option value="field-operation">Field Operations</option>
-              <option value="spray-program">Spray Programs</option>
-              <option value="fertilizer-program">Fertilizer Programs</option>
-              <option value="reminder">Reminders</option>
-              <option value="manual">Manual Events</option>
+              <optgroup label="Field Operations">
+                <option value="field-operation">General Field Operations</option>
+                <option value="planting">Planting/Seeding</option>
+                <option value="cultivation">Cultivation/Tilling</option>
+                <option value="pruning">Pruning/Trimming</option>
+                <option value="harvesting">Harvesting</option>
+                <option value="irrigation">Irrigation</option>
+                <option value="weeding">Weeding</option>
+                <option value="mulching">Mulching</option>
+                <option value="transplanting">Transplanting</option>
+                <option value="soil-preparation">Soil Preparation</option>
+                <option value="composting">Composting</option>
+                <option value="equipment-maintenance">Equipment Maintenance</option>
+              </optgroup>
+              <optgroup label="Application Programs">
+                <option value="spray-program">Spray Programs</option>
+                <option value="fertilizer-program">Fertilizer Programs</option>
+              </optgroup>
+              <optgroup label="Other">
+                <option value="reminder">Reminders</option>
+                <option value="manual">Manual Events</option>
+              </optgroup>
             </select>
 
             <select
@@ -624,6 +1184,18 @@ export default function UnifiedOperationsCalendar({
             <div className="text-sm bg-gray-100 px-3 py-2 rounded-lg flex items-center justify-center">
               <span className="font-medium text-gray-700">{filteredEvents.length} events</span>
             </div>
+
+            <div className="text-xs bg-blue-50 border border-blue-200 px-3 py-2 rounded-lg flex items-center justify-center">
+              <i className="ri-information-line mr-1 text-blue-600"></i>
+              <span className="text-blue-700">💡 Drag buttons to calendar dates for quick event creation</span>
+            </div>
+
+            {isDraggingToCalendar && (
+              <div className="text-sm bg-yellow-100 border border-yellow-400 px-3 py-2 rounded-lg flex items-center justify-center animate-bounce">
+                <i className="ri-drag-drop-line mr-2 text-yellow-600"></i>
+                <span className="font-bold text-yellow-800">🎯 DROP buttons on calendar dates to create events!</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -634,22 +1206,563 @@ export default function UnifiedOperationsCalendar({
 
         {/* Legend */}
         <div className="p-4 border-t bg-white rounded-b-xl">
-          <div className="flex flex-wrap justify-center gap-6">
+          <div className="flex flex-wrap justify-center gap-4 text-xs">
             {[
-              { type: 'field-operation', label: 'Field Operations', color: 'bg-blue-500' },
+              { type: 'planting', label: 'Planting', color: 'bg-green-600' },
+              { type: 'cultivation', label: 'Cultivation', color: 'bg-amber-600' },
+              { type: 'pruning', label: 'Pruning', color: 'bg-emerald-600' },
+              { type: 'harvesting', label: 'Harvesting', color: 'bg-yellow-600' },
+              { type: 'irrigation', label: 'Irrigation', color: 'bg-cyan-500' },
               { type: 'spray-program', label: 'Spray Programs', color: 'bg-purple-500' },
-              { type: 'fertilizer-program', label: 'Fertilizer Programs', color: 'bg-green-500' },
-              { type: 'reminder', label: 'Reminders', color: 'bg-orange-500' },
-              { type: 'manual', label: 'Manual Events', color: 'bg-gray-500' }
+              { type: 'fertilizer-program', label: 'Fertilizer', color: 'bg-green-500' },
+              { type: 'reminder', label: 'Reminders', color: 'bg-orange-500' }
             ].map((item) => (
-              <div key={item.type} className="flex items-center space-x-2">
-                <div className={`w-4 h-4 ${item.color} rounded-full`}></div>
-                <span className="text-sm font-medium text-gray-700">{item.label}</span>
+              <div key={item.type} className="flex items-center space-x-1">
+                <div className={`w-3 h-3 ${item.color} rounded-full`}></div>
+                <span className="font-medium text-gray-700">{item.label}</span>
               </div>
             ))}
           </div>
+          <p className="text-center text-xs text-gray-500 mt-2">
+            <i className="ri-information-line mr-1"></i>
+            Field operations include: weeding, mulching, transplanting, soil preparation, composting, equipment maintenance & more
+          </p>
         </div>
       </div>
+
+      {/* Quick Add Modal */}
+      {showQuickAdd && quickAddDate && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[70] p-4"
+          onClick={() => setShowQuickAdd(false)}
+        >
+          <div 
+            className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"
+            style={{ 
+              position: 'absolute',
+              left: Math.min(quickAddPosition.x, window.innerWidth - 400),
+              top: Math.min(quickAddPosition.y, window.innerHeight - 300)
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900">
+                Quick Add Event - {quickAddDate}
+              </h3>
+              <button
+                onClick={() => setShowQuickAdd(false)}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="space-y-3">
+              {[
+                { type: 'field', label: 'Field Operation', icon: 'ri-plant-line', color: 'bg-blue-600' },
+                { type: 'spray', label: 'Spray Program', icon: 'ri-drop-line', color: 'bg-purple-600' },
+                { type: 'reminder', label: 'Reminder', icon: 'ri-notification-line', color: 'bg-orange-600' }
+              ].map((option) => (
+                <button
+                  key={option.type}
+                  onClick={() => {
+                    const title = prompt(`Enter ${option.label} title:`);
+                    if (title) {
+                      createQuickEvent(option.type as 'field' | 'spray' | 'reminder', title);
+                    }
+                  }}
+                  className={`w-full ${option.color} text-white p-3 rounded-lg hover:opacity-90 transition-opacity flex items-center`}
+                >
+                  <i className={`${option.icon} mr-3`}></i>
+                  Add {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Event Modal */}
+      {showAddEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className={`bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl transition-all duration-200 ${
+            isDraggingToCalendar ? 'ring-4 ring-blue-200 border-blue-300' : ''
+          }`}>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Add New Event</h3>
+                {isDraggingToCalendar && (
+                  <p className="text-sm text-blue-600 mt-1">
+                    <i className="ri-information-line mr-1"></i>
+                    Drag the date icon to any calendar cell to set the date
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setShowAddEvent(false);
+                  setIsDraggingToCalendar(false);
+                  setDragTargetDate(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              const eventData = {
+                title: formData.get('title'),
+                type: formData.get('type'),
+                date: formData.get('date'),
+                startTime: formData.get('startTime'),
+                endTime: formData.get('endTime'),
+                description: formData.get('description'),
+                priority: formData.get('priority'),
+                assignedTo: formData.get('assignedTo'),
+                field: formData.get('field'),
+                status: 'scheduled'
+              };
+              handleAddEvent(eventData);
+              setShowAddEvent(false);
+              setIsDraggingToCalendar(false);
+              setDragTargetDate(null);
+            }}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      name="title"
+                      required
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="Event title"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      name="type"
+                      required
+                      defaultValue="field-operation"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <optgroup label="Field Operations">
+                        <option value="field-operation">General Field Operation</option>
+                        <option value="planting">Planting/Seeding</option>
+                        <option value="cultivation">Cultivation/Tilling</option>
+                        <option value="pruning">Pruning/Trimming</option>
+                        <option value="harvesting">Harvesting</option>
+                        <option value="irrigation">Irrigation</option>
+                        <option value="weeding">Weeding</option>
+                        <option value="mulching">Mulching</option>
+                        <option value="transplanting">Transplanting</option>
+                        <option value="soil-preparation">Soil Preparation</option>
+                        <option value="composting">Composting</option>
+                        <option value="equipment-maintenance">Equipment Maintenance</option>
+                      </optgroup>
+                      <optgroup label="Application Programs">
+                        <option value="spray-program">Spray Program</option>
+                        <option value="fertilizer-program">Fertilizer Program</option>
+                      </optgroup>
+                      <optgroup label="Other">
+                        <option value="reminder">Reminder</option>
+                        <option value="manual">Manual Event</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        name="date"
+                        required
+                        defaultValue={new Date().toISOString().split('T')[0]}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                      <div
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', 'modal-drag');
+                          e.dataTransfer.effectAllowed = 'copy';
+                          setIsDraggingToCalendar(true);
+                        }}
+                        onDragEnd={() => {
+                          setIsDraggingToCalendar(false);
+                          setDragTargetDate(null);
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-move p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Drag to calendar to set date"
+                      >
+                        <i className="ri-drag-move-line"></i>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <i className="ri-information-line mr-1"></i>
+                      Drag the <i className="ri-drag-move-line"></i> icon to a calendar date
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      name="startTime"
+                      defaultValue="08:00"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input
+                      type="time"
+                      name="endTime"
+                      defaultValue="12:00"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      name="priority"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                    <select
+                      name="assignedTo"
+                      defaultValue="Farm Manager"
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="Farm Manager">Farm Manager</option>
+                      <option value="Joseph Pacho">Joseph Pacho</option>
+                      <option value="Field Supervisor">Field Supervisor</option>
+                      <option value="Farm Team">Farm Team</option>
+                      <option value="Equipment Operator">Equipment Operator</option>
+                      <option value="Irrigation Specialist">Irrigation Specialist</option>
+                      <option value="Harvest Crew">Harvest Crew</option>
+                      <option value="Maintenance Team">Maintenance Team</option>
+                      <option value="Quality Control">Quality Control</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Field</label>
+                  <select
+                    name="field"
+                    defaultValue={fields && fields.length > 0 ? fields[0].name : ""}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">Select field</option>
+                    {fields && fields.map((field) => (
+                      <option key={field.id} value={field.name}>
+                        {field.name} ({field.size} - {field.crop})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Event description"
+                  ></textarea>
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Add Event
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddEvent(false);
+                      setIsDraggingToCalendar(false);
+                      setDragTargetDate(null);
+                    }}
+                    className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Event Modal */}
+      {editingEvent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+          <div className={`bg-white rounded-lg p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-xl transition-all duration-200 ${
+            isDraggingToCalendar ? 'ring-4 ring-blue-200 border-blue-300' : ''
+          }`}>
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900">Edit Event</h3>
+                {isDraggingToCalendar && (
+                  <p className="text-sm text-blue-600 mt-1">
+                    <i className="ri-information-line mr-1"></i>
+                    Drag the date icon to any calendar cell to set the date
+                  </p>
+                )}
+              </div>
+              <button
+                onClick={() => {
+                  setEditingEvent(null);
+                  setIsDraggingToCalendar(false);
+                  setDragTargetDate(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              const formData = new FormData(e.target as HTMLFormElement);
+              const eventData = {
+                title: formData.get('title'),
+                type: formData.get('type'),
+                date: formData.get('date'),
+                startTime: formData.get('startTime'),
+                endTime: formData.get('endTime'),
+                description: formData.get('description'),
+                priority: formData.get('priority'),
+                assignedTo: formData.get('assignedTo'),
+                field: formData.get('field'),
+                status: formData.get('status')
+              };
+              handleUpdateEvent(editingEvent.id, eventData);
+              setEditingEvent(null);
+              setIsDraggingToCalendar(false);
+              setDragTargetDate(null);
+            }}>
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Title</label>
+                    <input
+                      type="text"
+                      name="title"
+                      required
+                      defaultValue={editingEvent.title}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      placeholder="Event title"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+                    <select
+                      name="type"
+                      required
+                      defaultValue={editingEvent.type}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <optgroup label="Field Operations">
+                        <option value="field-operation">General Field Operation</option>
+                        <option value="planting">Planting/Seeding</option>
+                        <option value="cultivation">Cultivation/Tilling</option>
+                        <option value="pruning">Pruning/Trimming</option>
+                        <option value="harvesting">Harvesting</option>
+                        <option value="irrigation">Irrigation</option>
+                        <option value="weeding">Weeding</option>
+                        <option value="mulching">Mulching</option>
+                        <option value="transplanting">Transplanting</option>
+                        <option value="soil-preparation">Soil Preparation</option>
+                        <option value="composting">Composting</option>
+                        <option value="equipment-maintenance">Equipment Maintenance</option>
+                      </optgroup>
+                      <optgroup label="Application Programs">
+                        <option value="spray-program">Spray Program</option>
+                        <option value="fertilizer-program">Fertilizer Program</option>
+                      </optgroup>
+                      <optgroup label="Other">
+                        <option value="reminder">Reminder</option>
+                        <option value="manual">Manual Event</option>
+                      </optgroup>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+                    <div className="relative">
+                      <input
+                        type="date"
+                        name="date"
+                        required
+                        defaultValue={editingEvent.date}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                      />
+                      <div
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/plain', 'modal-drag');
+                          e.dataTransfer.effectAllowed = 'copy';
+                          setIsDraggingToCalendar(true);
+                        }}
+                        onDragEnd={() => {
+                          setIsDraggingToCalendar(false);
+                          setDragTargetDate(null);
+                        }}
+                        className="absolute right-2 top-1/2 transform -translate-y-1/2 cursor-move p-1 text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Drag to calendar to set date"
+                      >
+                        <i className="ri-drag-move-line"></i>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">
+                      <i className="ri-information-line mr-1"></i>
+                      Drag the <i className="ri-drag-move-line"></i> icon to a calendar date
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Time</label>
+                    <input
+                      type="time"
+                      name="startTime"
+                      defaultValue={editingEvent.startTime}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Time</label>
+                    <input
+                      type="time"
+                      name="endTime"
+                      defaultValue={editingEvent.endTime}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Priority</label>
+                    <select
+                      name="priority"
+                      defaultValue={editingEvent.priority}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="urgent">Urgent</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select
+                      name="status"
+                      defaultValue={editingEvent.status}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="scheduled">Scheduled</option>
+                      <option value="in-progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Assigned To</label>
+                  <select
+                    name="assignedTo"
+                    defaultValue={editingEvent.assignedTo}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">Select assignee</option>
+                    <option value="Farm Manager">Farm Manager</option>
+                    <option value="Joseph Pacho">Joseph Pacho</option>
+                    <option value="Field Supervisor">Field Supervisor</option>
+                    <option value="Farm Team">Farm Team</option>
+                    <option value="Equipment Operator">Equipment Operator</option>
+                    <option value="Irrigation Specialist">Irrigation Specialist</option>
+                    <option value="Harvest Crew">Harvest Crew</option>
+                    <option value="Maintenance Team">Maintenance Team</option>
+                    <option value="Quality Control">Quality Control</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Field</label>
+                  <select
+                    name="field"
+                    defaultValue={editingEvent.field}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                  >
+                    <option value="">Select field</option>
+                    {fields && fields.map((field) => (
+                      <option key={field.id} value={field.name}>
+                        {field.name} ({field.size} - {field.crop})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    name="description"
+                    rows={3}
+                    defaultValue={editingEvent.description}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Event description"
+                  ></textarea>
+                </div>
+
+                <div className="flex space-x-3 pt-4">
+                  <button
+                    type="submit"
+                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-lg hover:bg-green-700 transition-colors font-medium"
+                  >
+                    Update Event
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingEvent(null);
+                      setIsDraggingToCalendar(false);
+                      setDragTargetDate(null);
+                    }}
+                    className="flex-1 bg-gray-200 text-gray-700 py-2 px-4 rounded-lg hover:bg-gray-300 transition-colors font-medium"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Event Detail Modal */}
       {selectedEvent && (
@@ -677,6 +1790,153 @@ export default function UnifiedOperationsCalendar({
           }}
         />
       )}
+
+      {/* Field Selector Modal */}
+      {showFieldSelector && pendingEventData && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center modal-backdrop"
+          style={{ zIndex: 9999 }}
+          onClick={() => {
+            console.log('Field selector backdrop clicked, closing modal');
+            setShowFieldSelector(false);
+            setPendingEventData(null);
+          }}
+        >
+          <div 
+            className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl transform transition-all border-4 border-red-500 modal-content"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-xl font-semibold text-gray-900 flex items-center">
+                  <i className={`${pendingEventData.programType === 'spray' ? 'ri-drop-line text-purple-600' : pendingEventData.programType === 'fertilizer' ? 'ri-leaf-line text-green-600' : 'ri-plant-line text-blue-600'} mr-2 text-2xl`}></i>
+                  Choose Field - VISIBLE!
+                </h3>
+                <p className="text-sm text-gray-600 mt-1 font-bold">
+                  🎯 Select field for {pendingEventData.programType} program on {pendingEventData.date}
+                  <br />
+                  <span className="text-red-600">Modal is working! Fields: {fields?.length || 0}</span>
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowFieldSelector(false);
+                  setPendingEventData(null);
+                }}
+                className="text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <i className="ri-close-line text-xl"></i>
+              </button>
+            </div>
+            
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {fields && fields.length > 0 ? fields.map((field) => (
+                <button
+                  key={field.id}
+                  onClick={() => {
+                    handleButtonDragToCalendar(pendingEventData.date, pendingEventData.programType, field);
+                    setShowFieldSelector(false);
+                    setPendingEventData(null);
+                  }}
+                  className="w-full bg-gradient-to-r from-gray-50 to-white p-4 rounded-lg hover:from-blue-50 hover:to-blue-100 transition-all border border-gray-200 hover:border-blue-300 text-left group shadow-sm hover:shadow-md"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="font-semibold text-gray-900 group-hover:text-blue-900">
+                        {field.name}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {field.size} • {field.crop} • {field.status}
+                      </div>
+                      {field.description && (
+                        <div className="text-xs text-gray-500 mt-1 truncate">
+                          {field.description}
+                        </div>
+                      )}
+                    </div>
+                    <div className="ml-4 flex items-center space-x-2">
+                      <div className={`w-3 h-3 rounded-full ${field.status === 'growing' ? 'bg-green-500' : field.status === 'harvested' ? 'bg-yellow-500' : 'bg-gray-400'}`}></div>
+                      <i className="ri-arrow-right-line text-gray-400 group-hover:text-blue-600 transition-colors"></i>
+                    </div>
+                  </div>
+                </button>
+              )) : (
+                <div className="text-center py-8 text-gray-500">
+                  <i className="ri-plant-line text-4xl mb-2"></i>
+                  <p>No fields available</p>
+                  <button
+                    onClick={() => {
+                      // Use default field
+                      handleButtonDragToCalendar(pendingEventData.date, pendingEventData.programType);
+                      setShowFieldSelector(false);
+                      setPendingEventData(null);
+                    }}
+                    className="mt-3 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Create with Default Field
+                  </button>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-gray-200">
+              <div className="flex justify-between items-center">
+                <button
+                  onClick={() => {
+                    setShowFieldSelector(false);
+                    setPendingEventData(null);
+                  }}
+                  className="text-gray-600 hover:text-gray-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                {fields && fields.length > 0 && (
+                  <button
+                    onClick={() => {
+                      // Use first field as default
+                      handleButtonDragToCalendar(pendingEventData.date, pendingEventData.programType, fields[0]);
+                      setShowFieldSelector(false);
+                      setPendingEventData(null);
+                    }}
+                    className="bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                  >
+                    Use First Field
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Toast */}
+      {showSuccessToast && (
+        <div className="fixed top-4 right-4 z-[80] bg-gradient-to-r from-green-500 to-emerald-600 text-white px-8 py-4 rounded-xl shadow-2xl flex items-center space-x-4 animate-bounce border-2 border-green-300 transform hover:scale-105 transition-all">
+          {/* Sticker corner peel */}
+          <div className="absolute top-0 right-0 w-0 h-0 border-l-8 border-b-8 border-l-transparent border-b-white opacity-20"></div>
+          
+          <div className="flex items-center space-x-3">
+            <div className="bg-white rounded-full p-2">
+              <i className="ri-checkbox-circle-fill text-green-600 text-xl"></i>
+            </div>
+            <div>
+              <div className="font-bold text-lg">Sticker Added! 🎯</div>
+              <div className="font-medium opacity-90">{successMessage}</div>
+            </div>
+          </div>
+          
+          <button
+            onClick={() => setShowSuccessToast(false)}
+            className="text-white hover:text-green-200 ml-4 bg-white bg-opacity-20 rounded-full p-1 hover:bg-opacity-30 transition-all"
+          >
+            <i className="ri-close-line"></i>
+          </button>
+          
+          {/* Animated sparkles */}
+          <div className="absolute -top-1 -left-1 text-yellow-300 animate-ping">✨</div>
+          <div className="absolute -bottom-1 -right-1 text-yellow-300 animate-ping">✨</div>
+        </div>
+      )}
     </div>
   );
 }
@@ -693,6 +1953,17 @@ function EventDetailModal({ event, onClose, onEdit, onDelete }: EventDetailModal
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'field-operation': return 'ri-plant-line';
+      case 'planting': return 'ri-seedling-line';
+      case 'cultivation': return 'ri-tools-line';
+      case 'pruning': return 'ri-scissors-cut-line';
+      case 'harvesting': return 'ri-harvest-line';
+      case 'irrigation': return 'ri-drop-line';
+      case 'weeding': return 'ri-leaf-line';
+      case 'mulching': return 'ri-stack-line';
+      case 'transplanting': return 'ri-plant-fill';
+      case 'soil-preparation': return 'ri-landscape-line';
+      case 'composting': return 'ri-recycle-line';
+      case 'equipment-maintenance': return 'ri-tools-fill';
       case 'spray-program': return 'ri-drop-line';
       case 'fertilizer-program': return 'ri-leaf-line';
       case 'reminder': return 'ri-alarm-line';
@@ -703,7 +1974,18 @@ function EventDetailModal({ event, onClose, onEdit, onDelete }: EventDetailModal
 
   const getTypeLabel = (type: string) => {
     switch (type) {
-      case 'field-operation': return 'Field Operation';
+      case 'field-operation': return 'General Field Operation';
+      case 'planting': return 'Planting/Seeding';
+      case 'cultivation': return 'Cultivation/Tilling';
+      case 'pruning': return 'Pruning/Trimming';
+      case 'harvesting': return 'Harvesting';
+      case 'irrigation': return 'Irrigation';
+      case 'weeding': return 'Weeding';
+      case 'mulching': return 'Mulching';
+      case 'transplanting': return 'Transplanting';
+      case 'soil-preparation': return 'Soil Preparation';
+      case 'composting': return 'Composting';
+      case 'equipment-maintenance': return 'Equipment Maintenance';
       case 'spray-program': return 'Spray Program';
       case 'fertilizer-program': return 'Fertilizer Program';
       case 'reminder': return 'Reminder';
