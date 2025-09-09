@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, dbHelpers } from '@/lib/database-api';
+import { sql, dbHelpers } from '@/lib/database-api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -29,23 +29,36 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const field = await prisma.field.create({
-      data: {
-        name: data.name,
-        size: data.size,
-        location: data.location,
-        soilType: data.soilType,
-        soilPh: data.soilPh ? parseFloat(data.soilPh) : null,
-        status: data.status || 'active',
-        crop: data.crop,
-        plantingDate: data.plantingDate ? new Date(data.plantingDate) : null,
-        expectedHarvest: data.expectedHarvest ? new Date(data.expectedHarvest) : null,
-        progress: parseInt(data.progress || '0'),
-        temperature: data.temperature,
-        humidity: data.humidity,
-        notes: data.notes
-      }
-    });
+    const fieldId = `field_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const result = await sql`
+      INSERT INTO fields (
+        id, name, size, location, soil_type, soil_ph, status, crop, 
+        planting_date, expected_harvest, progress, temperature, humidity, 
+        notes, created_at, updated_at
+      )
+      VALUES (
+        ${fieldId},
+        ${data.name},
+        ${data.size || null},
+        ${data.location || null},
+        ${data.soilType || null},
+        ${data.soilPh ? parseFloat(data.soilPh) : null},
+        ${data.status || 'active'},
+        ${data.crop || null},
+        ${data.plantingDate ? new Date(data.plantingDate) : null},
+        ${data.expectedHarvest ? new Date(data.expectedHarvest) : null},
+        ${parseInt(data.progress || '0')},
+        ${data.temperature || null},
+        ${data.humidity || null},
+        ${data.notes || null},
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    const field = result[0];
 
     return NextResponse.json(field, { status: 201 });
   } catch (error) {

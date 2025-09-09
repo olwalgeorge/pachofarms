@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { carePrograms } from '@/lib/neon-db';
+import { sql } from '@/lib/database';
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,20 +8,53 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const type = searchParams.get('type');
 
-    const where: any = {};
-    if (fieldId) where.fieldId = fieldId;
-    if (status) where.status = status;
-    if (type) where.type = type;
+    let query = sql`
+      SELECT 
+        cp.id,
+        cp.name,
+        cp.type,
+        cp.field_id,
+        cp.product,
+        cp.dosage,
+        cp.frequency,
+        cp.status,
+        cp.next_application,
+        cp.notes,
+        cp.created_at,
+        cp.updated_at,
+        f.name as field_name,
+        f.location as field_location
+      FROM care_programs cp
+      LEFT JOIN fields f ON cp.field_id = f.id
+      WHERE 1=1
+    `;
 
-    const programs = await carePrograms.findMany({
-      where,
-      include: {
-        field: true
-      },
-      orderBy: { nextApplication: 'asc' }
-    });
+    const conditions = [];
+    if (fieldId) {
+      query = sql`${query} AND cp.field_id = ${fieldId}`;
+    }
+    if (status) {
+      query = sql`${query} AND cp.status = ${status}`;
+    }
+    if (type) {
+      query = sql`${query} AND cp.type = ${type}`;
+    }
 
-    return NextResponse.json(programs);
+    query = sql`${query} ORDER BY cp.next_application ASC`;
+
+    const programs = await query;
+
+    // Transform the data to include field object for compatibility
+    const transformedPrograms = programs.map(program => ({
+      ...program,
+      field: {
+        id: program.field_id,
+        name: program.field_name,
+        location: program.field_location
+      }
+    }));
+
+    return NextResponse.json(transformedPrograms);
   } catch (error) {
     console.error('Error fetching care programs:', error);
     return NextResponse.json(
@@ -42,19 +75,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const program = await carePrograms.create({
-      name: data.name,
-      type: data.type,
-      fieldId: data.fieldId,
-      product: data.product,
-      dosage: data.dosage,
-      frequency: data.frequency,
-      status: data.status || 'active',
-      nextApplication: new Date(data.nextApplication),
-      notes: data.notes
-    });
+    const result = await sql`
+      INSERT INTO care_programs (
+        id, name, type, field_id, product, dosage, frequency, status, next_application, notes
+      )
+      VALUES (
+        uuid_generate_v4()::text,
+        ${data.name},
+        ${data.type},
+        ${data.fieldId},
+        ${data.product || ''},
+        ${data.dosage || ''},
+        ${data.frequency || ''},
+        ${data.status || 'active'},
+        ${new Date(data.nextApplication).toISOString()},
+        ${data.notes || ''}
+      )
+      RETURNING *
+    `;
 
-    return NextResponse.json(program, { status: 201 });
+    return NextResponse.json(result[0], { status: 201 });
   } catch (error) {
     console.error('Error creating care program:', error);
     return NextResponse.json(
@@ -76,12 +116,31 @@ export async function PUT(request: NextRequest) {
       );
     }
 
-    const program = await carePrograms.update(id, {
-      ...updateData,
-      nextApplication: updateData.nextApplication ? new Date(updateData.nextApplication) : undefined
-    });
+    const result = await sql`
+      UPDATE care_programs
+      SET 
+        name = ${updateData.name || sql`name`},
+        type = ${updateData.type || sql`type`},
+        field_id = ${updateData.fieldId || sql`field_id`},
+        product = ${updateData.product || sql`product`},
+        dosage = ${updateData.dosage || sql`dosage`},
+        frequency = ${updateData.frequency || sql`frequency`},
+        status = ${updateData.status || sql`status`},
+        next_application = ${updateData.nextApplication ? new Date(updateData.nextApplication).toISOString() : sql`next_application`},
+        notes = ${updateData.notes || sql`notes`},
+        updated_at = NOW()
+      WHERE id = ${id}
+      RETURNING *
+    `;
 
-    return NextResponse.json(program);
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Care program not found' },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json(result[0]);
   } catch (error) {
     console.error('Error updating care program:', error);
     return NextResponse.json(
@@ -103,7 +162,18 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await carePrograms.delete(id);
+    const result = await sql`
+      DELETE FROM care_programs 
+      WHERE id = ${id}
+      RETURNING id
+    `;
+
+    if (result.length === 0) {
+      return NextResponse.json(
+        { error: 'Care program not found' },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json({ message: 'Care program deleted successfully' });
   } catch (error) {

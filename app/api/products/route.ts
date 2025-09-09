@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, dbHelpers } from '@/lib/database-api';
+import { sql, dbHelpers } from '@/lib/database-api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,18 +18,10 @@ export async function GET(request: NextRequest) {
       offset
     });
 
-    const total = await prisma.product.count({
-      where: {
-        ...(category && { category }),
-        ...(status && { status }),
-        ...(search && {
-          OR: [
-            { name: { contains: search } },
-            { description: { contains: search } },
-            { variety: { contains: search } }
-          ]
-        })
-      }
+    const total = await dbHelpers.getProductCount({
+      category,
+      status,
+      search
     });
 
     return NextResponse.json({
@@ -62,40 +54,59 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const product = await prisma.product.create({
-      data: {
-        name: data.name,
-        description: data.description,
-        category: data.category,
-        variety: data.variety,
-        origin: data.origin,
-        price: parseFloat(data.price),
-        unit: data.unit,
-        stock: parseInt(data.stock || '0'),
-        minStock: parseInt(data.minStock || '5'),
-        maxStock: parseInt(data.maxStock || '100'),
-        status: data.status || 'active',
-        image: data.image,
-        tags: data.tags ? JSON.stringify(data.tags) : null,
-        nutritionInfo: data.nutritionInfo ? JSON.stringify(data.nutritionInfo) : null,
-        growingInfo: data.growingInfo ? JSON.stringify(data.growingInfo) : null,
-        harvestDate: data.harvestDate ? new Date(data.harvestDate) : null,
-        expiryDate: data.expiryDate ? new Date(data.expiryDate) : null
-      }
-    });
+    const productId = `product_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const result = await sql`
+      INSERT INTO products (
+        id, name, description, category, variety, origin, price, unit, 
+        stock, min_stock, max_stock, status, image, tags, nutrition_info, 
+        growing_info, harvest_date, expiry_date, created_at, updated_at
+      )
+      VALUES (
+        ${productId},
+        ${data.name},
+        ${data.description || null},
+        ${data.category},
+        ${data.variety || null},
+        ${data.origin || null},
+        ${parseFloat(data.price)},
+        ${data.unit},
+        ${parseInt(data.stock || '0')},
+        ${parseInt(data.minStock || '5')},
+        ${parseInt(data.maxStock || '100')},
+        ${data.status || 'active'},
+        ${data.image || null},
+        ${data.tags ? JSON.stringify(data.tags) : null},
+        ${data.nutritionInfo ? JSON.stringify(data.nutritionInfo) : null},
+        ${data.growingInfo ? JSON.stringify(data.growingInfo) : null},
+        ${data.harvestDate ? new Date(data.harvestDate) : null},
+        ${data.expiryDate ? new Date(data.expiryDate) : null},
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    const product = result[0];
 
     // Create initial inventory log if stock > 0
     if (product.stock > 0) {
-      await prisma.inventoryLog.create({
-        data: {
-          productId: product.id,
-          type: 'in',
-          quantity: product.stock,
-          reason: 'Initial stock',
-          previousStock: 0,
-          newStock: product.stock
-        }
-      });
+      await sql`
+        INSERT INTO inventory_logs (
+          id, product_id, type, quantity, reason, previous_stock, new_stock, created_at, updated_at
+        )
+        VALUES (
+          uuid_generate_v4()::text,
+          ${product.id},
+          'in',
+          ${product.stock},
+          'Initial stock',
+          0,
+          ${product.stock},
+          NOW(),
+          NOW()
+        )
+      `;
     }
 
     return NextResponse.json(product, { status: 201 });

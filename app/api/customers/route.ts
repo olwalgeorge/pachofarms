@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma, dbHelpers } from '@/lib/database-api';
+import { sql, dbHelpers } from '@/lib/database-api';
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,21 +35,33 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const customer = await prisma.customer.create({
-      data: {
-        name: data.name,
-        email: data.email,
-        phone: data.phone,
-        address: data.address,
-        city: data.city,
-        state: data.state,
-        zipCode: data.zipCode,
-        customerType: data.customerType || 'individual',
-        status: data.status || 'active',
-        leadScore: parseInt(data.leadScore || '0'),
-        notes: data.notes
-      }
-    });
+    const customerId = `customer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    const result = await sql`
+      INSERT INTO customers (
+        id, name, email, phone, address, city, state, zip_code, 
+        customer_type, status, lead_score, notes, created_at, updated_at
+      )
+      VALUES (
+        ${customerId},
+        ${data.name},
+        ${data.email},
+        ${data.phone || null},
+        ${data.address || null},
+        ${data.city || null},
+        ${data.state || null},
+        ${data.zipCode || null},
+        ${data.customerType || 'individual'},
+        ${data.status || 'active'},
+        ${parseInt(data.leadScore || '0')},
+        ${data.notes || null},
+        NOW(),
+        NOW()
+      )
+      RETURNING *
+    `;
+
+    const customer = result[0];
 
     return NextResponse.json(customer, { status: 201 });
   } catch (error) {

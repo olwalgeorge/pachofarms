@@ -9,14 +9,13 @@
     "lint": "next lint",
     "db:setup": "node scripts/setup-database.js",
     "db:neon": "node scripts/setup-neon.js",
-    "seed": "node prisma/seed.js"
+    "seed": "node scripts/seed-neon.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.1",
-    "@prisma/client": "^6.15.0",
     "@react-google-maps/api": "^2.19.3",
+    "dotenv": "^17.2.2",
     "next": "^15.5.2",
-    "prisma": "^6.15.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^3.0.2"

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/database-api';
+import { sql } from '@/lib/database-api';
 
 export async function GET() {
   try {
     // Test database connection
-    const result = await prisma.$queryRaw`SELECT 1 as test`;
+    const result = await sql`SELECT 1 as test`;
     
     // Get database info
-    const dbInfo = await prisma.$queryRaw`
+    const dbInfo = await sql`
       SELECT 
         current_database() as database_name,
         current_user as user_name,
@@ -15,7 +15,7 @@ export async function GET() {
     `;
 
     // Count existing tables
-    const tableCount = await prisma.$queryRaw`
+    const tableCount = await sql`
       SELECT COUNT(*) as table_count 
       FROM information_schema.tables 
       WHERE table_schema = 'public'
@@ -24,9 +24,9 @@ export async function GET() {
     return NextResponse.json({
       status: 'success',
       message: 'Database connection successful!',
-      database_info: dbInfo,
-      table_count: tableCount,
-      test_query: result,
+      database_info: dbInfo[0],
+      table_count: tableCount[0],
+      test_query: result[0],
       timestamp: new Date().toISOString()
     });
 

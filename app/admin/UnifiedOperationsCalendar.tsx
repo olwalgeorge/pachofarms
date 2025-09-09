@@ -8,7 +8,7 @@ interface UnifiedEvent {
   date: string;
   startTime: string;
   endTime: string;
-  type: 'field-operation' | 'planting' | 'cultivation' | 'pruning' | 'harvesting' | 'irrigation' | 'weeding' | 'mulching' | 'transplanting' | 'soil-preparation' | 'composting' | 'equipment-maintenance' | 'spray-program' | 'fertilizer-program' | 'watering-program' | 'pest-control' | 'disease-control' | 'reminder' | 'manual';
+  type: 'field-operation' | 'planting' | 'cultivation' | 'pruning' | 'harvesting' | 'irrigation' | 'weeding' | 'mulching' | 'transplanting' | 'soil-preparation' | 'composting' | 'equipment-maintenance' | 'spray-program' | 'fertilizer-program' | 'pest-control' | 'disease-control' | 'reminder' | 'manual';
   sourceId?: number;
   priority: 'low' | 'medium' | 'high' | 'urgent';
   status: 'scheduled' | 'in-progress' | 'completed' | 'cancelled' | 'pending';
@@ -98,7 +98,6 @@ export default function UnifiedOperationsCalendar({
       // Care Programs - Purple/Green family
       case 'spray-program': return 'bg-purple-500';
       case 'fertilizer-program': return 'bg-green-500';
-      case 'watering-program': return 'bg-blue-400';
       case 'pest-control': return 'bg-red-500';
       case 'disease-control': return 'bg-pink-500';
       // Other
@@ -134,7 +133,6 @@ export default function UnifiedOperationsCalendar({
       case 'equipment-maintenance': return 'Equipment Maintenance';
       case 'spray-program': return 'Spray Program';
       case 'fertilizer-program': return 'Fertilizer Program';
-      case 'watering-program': return 'Watering Program';
       case 'pest-control': return 'Pest Control';
       case 'disease-control': return 'Disease Control';
       case 'reminder': return 'Reminder';
@@ -159,7 +157,6 @@ export default function UnifiedOperationsCalendar({
       case 'equipment-maintenance': return 'ri-tools-fill';
       case 'spray-program': return 'ri-drop-line';
       case 'fertilizer-program': return 'ri-leaf-line';
-      case 'watering-program': return 'ri-water-drop-line';
       case 'pest-control': return 'ri-bug-line';
       case 'disease-control': return 'ri-medicine-bottle-line';
       case 'reminder': return 'ri-alarm-line';
@@ -207,16 +204,23 @@ export default function UnifiedOperationsCalendar({
             operationType = 'spray-program';
             break;
           case 'fertilizer':
+          case 'fertilization':
             operationType = 'fertilizer-program';
             break;
           case 'watering':
-            operationType = 'watering-program';
+            operationType = 'irrigation';
             break;
           case 'pest-control':
+          case 'pest_control':
             operationType = 'pest-control';
             break;
           case 'disease-control':
+          case 'disease_control':
             operationType = 'disease-control';
+            break;
+          case 'soil-conditioning':
+          case 'soil_conditioning':
+            operationType = 'soil-preparation';
             break;
           default:
             operationType = program.type || 'manual';
@@ -1209,7 +1213,6 @@ export default function UnifiedOperationsCalendar({
               <optgroup label="Care Programs">
                 <option value="spray-program">Spray Programs</option>
                 <option value="fertilizer-program">Fertilizer Programs</option>
-                <option value="watering-program">Watering Programs</option>
                 <option value="pest-control">Pest Control</option>
                 <option value="disease-control">Disease Control</option>
               </optgroup>
@@ -1269,10 +1272,9 @@ export default function UnifiedOperationsCalendar({
               { type: 'cultivation', label: 'Cultivation', color: 'bg-amber-600' },
               { type: 'pruning', label: 'Pruning', color: 'bg-emerald-600' },
               { type: 'harvesting', label: 'Harvesting', color: 'bg-yellow-600' },
-              { type: 'irrigation', label: 'Irrigation', color: 'bg-cyan-500' },
+              { type: 'irrigation', label: 'Irrigation/Watering', color: 'bg-cyan-500' },
               { type: 'spray-program', label: 'Spray Programs', color: 'bg-purple-500' },
               { type: 'fertilizer-program', label: 'Fertilizer', color: 'bg-green-500' },
-              { type: 'watering-program', label: 'Watering', color: 'bg-blue-400' },
               { type: 'pest-control', label: 'Pest Control', color: 'bg-red-500' },
               { type: 'disease-control', label: 'Disease Control', color: 'bg-pink-500' },
               { type: 'reminder', label: 'Reminders', color: 'bg-orange-500' }
