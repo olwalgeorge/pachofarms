@@ -124,7 +124,7 @@ export default function UnifiedOperationsCalendar({
       case 'cultivation': return 'Cultivation/Tilling';
       case 'pruning': return 'Pruning/Trimming';
       case 'harvesting': return 'Harvesting';
-      case 'irrigation': return 'Irrigation';
+      case 'irrigation': return 'Irrigation/Watering';
       case 'weeding': return 'Weeding';
       case 'mulching': return 'Mulching';
       case 'transplanting': return 'Transplanting';
@@ -2031,28 +2031,6 @@ function EventDetailModal({ event, onClose, onEdit, onDelete }: EventDetailModal
       case 'reminder': return 'ri-alarm-line';
       case 'manual': return 'ri-calendar-event-line';
       default: return 'ri-calendar-line';
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'field-operation': return 'General Field Operation';
-      case 'planting': return 'Planting/Seeding';
-      case 'cultivation': return 'Cultivation/Tilling';
-      case 'pruning': return 'Pruning/Trimming';
-      case 'harvesting': return 'Harvesting';
-      case 'irrigation': return 'Irrigation';
-      case 'weeding': return 'Weeding';
-      case 'mulching': return 'Mulching';
-      case 'transplanting': return 'Transplanting';
-      case 'soil-preparation': return 'Soil Preparation';
-      case 'composting': return 'Composting';
-      case 'equipment-maintenance': return 'Equipment Maintenance';
-      case 'spray-program': return 'Spray Program';
-      case 'fertilizer-program': return 'Fertilizer Program';
-      case 'reminder': return 'Reminder';
-      case 'manual': return 'Manual Event';
-      default: return 'Event';
     }
   };
 
